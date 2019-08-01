@@ -102,10 +102,13 @@ case class FilterDirectExec(condition: Expression, child: DirectPlan)
         predicate
       }
       val childIter: Iterator[InternalRow] = child.doExecute()
-      val DUMMY_ROW = new GenericInternalRow(null)
+      val DUMMY_ROW = new GenericInternalRow(0)
       var nextRow: InternalRow = DUMMY_ROW
 
       override def hasNext: Boolean = {
+        if (nextRow != DUMMY_ROW) {
+          return true
+        }
         while (childIter.hasNext) {
           nextRow = childIter.next()
           if (predicate.eval(nextRow)) {
@@ -118,8 +121,10 @@ case class FilterDirectExec(condition: Expression, child: DirectPlan)
 
       override def next: InternalRow = {
         if (nextRow != DUMMY_ROW || hasNext) {
+          val res = nextRow
           numOutputRows += 1
-          nextRow
+          nextRow = DUMMY_ROW
+          res
         } else {
           throw new NoSuchElementException
         }
