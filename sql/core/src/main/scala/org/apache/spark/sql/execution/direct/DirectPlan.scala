@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.direct
 
 import java.util.concurrent.TimeUnit
 
+import scala.collection.mutable.ArrayBuffer
+
 import com.google.common.base.Stopwatch
 import org.codehaus.commons.compiler.CompileException
 import org.codehaus.janino.InternalCompilerException
@@ -26,16 +28,7 @@ import org.codehaus.janino.InternalCompilerException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{
-  Ascending,
-  Attribute,
-  AttributeSet,
-  BoundReference,
-  Expression,
-  InterpretedPredicate,
-  MutableProjection,
-  SortOrder
-}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, AttributeSet, BoundReference, Expression, InterpretedPredicate, MutableProjection, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.{Predicate => GenPredicate, _}
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.execution.SparkPlan
@@ -83,7 +76,60 @@ abstract class DirectPlan extends QueryPlan[DirectPlan] with Logging {
     planMetrics.getOrElseUpdate(name, metricValue)
   }
 
-  def prepare(): Unit = children.foreach(_.prepare())
+  /**
+   * List of (uncorrelated scalar subquery, future holding the subquery result) for this plan node.
+   * This list is populated by [[prepareSubqueries]], which is called in [[prepare]].
+   */
+  @transient
+  private val runningSubqueries = new ArrayBuffer[ExecSubqueryExpression]
+
+  /**
+   * Finds scalar subquery expressions in this plan node and starts evaluating them.
+   */
+  protected def prepareSubqueries(): Unit = {
+    expressions.foreach ( m => {
+      m.collect {
+        case e: ExecSubqueryExpression =>
+          e.plan.doPrepare()
+          runningSubqueries += e
+      }
+    }
+    )
+  }
+
+  /**
+   * Blocks the thread until all subqueries finish evaluation and update the results.
+   */
+  protected def waitForSubqueries(): Unit = synchronized {
+    // fill in the result of subqueries
+    runningSubqueries.foreach { sub =>
+      sub.updateResult()
+    }
+    runningSubqueries.clear()
+  }
+
+  /**
+   * Whether the "prepare" method is called.
+   */
+  private var prepared = false
+
+  /**
+   * Prepares this SparkPlan for execution. It's idempotent.
+   */
+  final def doPrepare(): Unit = {
+    // doPrepare() may depend on it's children, we should call prepare() on all the children first.
+    children.foreach(_.doPrepare())
+    synchronized {
+      if (!prepared) {
+        prepareSubqueries()
+        prepare()
+        prepared = true
+      }
+    }
+    waitForSubqueries()
+  }
+
+  def prepare(): Unit = {}
 
   def doExecute(): Iterator[InternalRow]
 

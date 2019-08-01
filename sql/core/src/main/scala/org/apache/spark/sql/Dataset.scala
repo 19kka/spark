@@ -2787,6 +2787,7 @@ class Dataset[T] private[sql](
       // prepare a TaskContext for execution
       TaskContext.setTaskContext(new TaskContextImpl(0, 0, 0, 0, 0,
         taskMemoryManager, new Properties, null))
+      directExecutedPlan.doPrepare()
       val iter = directExecutedPlan.execute()
       val data = iter.map(enc.fromRow).toArray
       data

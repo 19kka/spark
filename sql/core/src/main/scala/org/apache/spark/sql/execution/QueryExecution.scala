@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.util.StringUtils.{PlanStringConcat, StringConcat}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.adaptive.InsertAdaptiveSparkPlan
-import org.apache.spark.sql.execution.direct.{DirectPlan, DirectPlanConverter}
+import org.apache.spark.sql.execution.direct.{DirectPlan, DirectPlanConverter, DirectPlanSubqueries}
 import org.apache.spark.sql.execution.exchange.{EnsureRequirements, ReuseExchange}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils
@@ -93,8 +93,13 @@ class QueryExecution(
     prepareForExecution(sparkPlan)
   }
 
+  lazy val directPrepareExecutedPlan: SparkPlan =
+    tracker.measurePhase(QueryPlanningTracker.PLANNING) {
+      prepareForDirectExecution(sparkPlan)
+    }
+
   lazy val directExecutedPlan: DirectPlan = tracker.measurePhase(QueryPlanningTracker.PLANNING) {
-    DirectPlanConverter.convert(sparkPlan)
+    DirectPlanConverter.convert(directPrepareExecutedPlan)
   }
 
   /**
@@ -117,6 +122,10 @@ class QueryExecution(
     preparations.foldLeft(plan) { case (sp, rule) => rule.apply(sp) }
   }
 
+  protected def prepareForDirectExecution(plan: SparkPlan): SparkPlan = {
+    directPreparations.foldLeft(plan) { case (sp, rule) => rule.apply(sp) }
+  }
+
   /** A sequence of rules that will be applied in order to the physical plan before execution. */
   protected def preparations: Seq[Rule[SparkPlan]] = Seq(
     // `AdaptiveSparkPlanExec` is a leaf node. If inserted, all the following rules will be no-op
@@ -124,11 +133,15 @@ class QueryExecution(
     InsertAdaptiveSparkPlan(sparkSession),
     PlanSubqueries(sparkSession),
     EnsureRequirements(sparkSession.sessionState.conf),
-    ApplyColumnarRulesAndInsertTransitions(sparkSession.sessionState.conf,
+    ApplyColumnarRulesAndInsertTransitions(
+      sparkSession.sessionState.conf,
       sparkSession.sessionState.columnarRules),
     CollapseCodegenStages(sparkSession.sessionState.conf),
     ReuseExchange(sparkSession.sessionState.conf),
     ReuseSubquery(sparkSession.sessionState.conf))
+
+  protected def directPreparations: Seq[Rule[SparkPlan]] =
+    Seq(DirectPlanSubqueries(sparkSession))
 
   def simpleString: String = withRedaction {
     val concat = new PlanStringConcat()
