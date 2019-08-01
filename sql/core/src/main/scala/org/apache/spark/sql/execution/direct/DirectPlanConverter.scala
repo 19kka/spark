@@ -19,12 +19,11 @@ package org.apache.spark.sql.execution.direct
 
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec}
-import org.apache.spark.sql.execution.joins.{
-  BroadcastNestedLoopJoinExec,
-  CartesianProductExec,
-  HashJoin,
-  SortMergeJoinExec
-}
+import org.apache.spark.sql.execution.direct.window.WindowDirectExec
+import org.apache.spark.sql.execution.joins.{BroadcastNestedLoopJoinExec, CartesianProductExec, HashJoin, SortMergeJoinExec}
+import org.apache.spark.sql.execution.window.WindowExec
+
+
 object DirectPlanConverter {
 
   def convert(plan: SparkPlan): DirectPlan = {
@@ -36,6 +35,8 @@ object DirectPlanConverter {
         FilterDirectExec(condition, convert(child))
       case DynamicLocalTableScanExec(output, name) =>
         LocalTableScanDirectExec(output, name)
+      case CollectLimitExec(limit, child) =>
+        LimitDirectExec(limit, convert(child))
 
       // join
       case hashJoin: HashJoin =>
@@ -79,6 +80,13 @@ object DirectPlanConverter {
           hashAggregateExec.initialInputBufferOffset,
           hashAggregateExec.resultExpressions,
           convert(hashAggregateExec.child))
+
+      case windowExec: WindowExec =>
+        WindowDirectExec(
+          windowExec.windowExpression,
+          windowExec.partitionSpec,
+          windowExec.orderSpec,
+          convert(windowExec.child))
 
       // TODO other
       case other => DirectPlanAdapter(other)
