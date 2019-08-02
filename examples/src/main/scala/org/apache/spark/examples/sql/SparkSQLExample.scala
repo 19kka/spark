@@ -155,11 +155,11 @@ object SparkSQLExample {
 
 //    val sqlDF = spark.sql("SELECT substring(name,0,1) as c1 ,age as c2 FROM people where age>1")
 //    val sqlDF = spark.sql("SELECT substring(t1.name,0,1) as c1 ,substring(t2.name,0,2) as c2 FROM people t1,people2 t2 where t1.name=t2.name and t2.age>0")
-//val sqlDF = spark.sql("SELECT name,ROW_NUMBER() OVER (PARTITION BY genda ORDER BY name) as row FROM people")
+val sqlDF = spark.sql("SELECT name,ROW_NUMBER() OVER (PARTITION BY genda ORDER BY name) as row FROM people")
 
 //    val sqlDF = spark.sql("SELECT genda,max(age),count(*) FROM people group by genda")
 
-    val sqlDF = spark.sql("select name,age from people order by age")
+//    val sqlDF = spark.sql("select name,age from people order by age")
     //    val rt = sqlDF.collect()
     val s1 = StopWatch.createStarted()
     val rt = sqlDF.collectDirectly()

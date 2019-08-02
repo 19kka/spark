@@ -105,6 +105,11 @@ object DirectPlanConverter {
           sortAggregateExec.initialInputBufferOffset,
           sortAggregateExec.resultExpressions,
           convert(sortAggregateExec.child))
+      case sortExec: SortExec =>
+        SortDirectExec(sortExec.sortOrder,
+          sortExec.global,
+          convert(sortExec.child),
+          sortExec.testSpillFrequency)
 
       // TODO other
       case other => DirectPlanAdapter(other)

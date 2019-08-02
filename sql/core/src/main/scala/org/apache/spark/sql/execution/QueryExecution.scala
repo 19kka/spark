@@ -20,7 +20,6 @@ package org.apache.spark.sql.execution
 import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, QueryPlanningTracker}
@@ -31,7 +30,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.util.StringUtils.{PlanStringConcat, StringConcat}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.adaptive.InsertAdaptiveSparkPlan
-import org.apache.spark.sql.execution.direct.{DirectPlan, DirectPlanConverter, DirectPlanSubqueries}
+import org.apache.spark.sql.execution.direct.{DirectEnsureRequirements, DirectPlan, DirectPlanConverter, DirectPlanSubqueries}
 import org.apache.spark.sql.execution.exchange.{EnsureRequirements, ReuseExchange}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils
@@ -141,7 +140,8 @@ class QueryExecution(
     ReuseSubquery(sparkSession.sessionState.conf))
 
   protected def directPreparations: Seq[Rule[SparkPlan]] =
-    Seq(DirectPlanSubqueries(sparkSession))
+    Seq(DirectPlanSubqueries(sparkSession),
+      DirectEnsureRequirements(sparkSession.sessionState.conf))
 
   def simpleString: String = withRedaction {
     val concat = new PlanStringConcat()

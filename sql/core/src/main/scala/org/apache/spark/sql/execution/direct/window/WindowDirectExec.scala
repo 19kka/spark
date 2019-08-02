@@ -86,7 +86,7 @@ case class WindowDirectExec(windowExpression: Seq[NamedExpression],
 //
 //  override def outputPartitioning: Partitioning = child.outputPartitioning
 
-  override def doExecute(): Iterator[InternalRow] = {
+  def doExecute(): Iterator[InternalRow] = {
     requiredChildOrdering
 
 
