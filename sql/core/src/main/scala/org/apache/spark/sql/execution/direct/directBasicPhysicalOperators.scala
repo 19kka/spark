@@ -28,7 +28,17 @@ import org.apache.spark.{SparkConf, TaskContext, TaskContextImpl}
 import org.apache.spark.internal.config.MEMORY_OFFHEAP_ENABLED
 import org.apache.spark.memory.{TaskMemoryManager, UnifiedMemoryManager}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, GenericInternalRow, IsNotNull, NamedExpression, NullIntolerant, PredicateHelper, UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{
+  Attribute,
+  Expression,
+  GenericInternalRow,
+  IsNotNull,
+  NamedExpression,
+  NullIntolerant,
+  PredicateHelper,
+  UnsafeProjection,
+  UnsafeRow
+}
 import org.apache.spark.sql.catalyst.expressions.codegen.Predicate
 import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -173,8 +183,8 @@ case class SubqueryDirectExec(name: String, child: DirectPlan)
               1),
             0)
           // prepare a TaskContext for execution
-          TaskContext.setTaskContext(new TaskContextImpl(0, 0, 0, 0, 0,
-            taskMemoryManager, new Properties, null))
+          TaskContext.setTaskContext(
+            new TaskContextImpl(0, 0, 0, 0, 0, taskMemoryManager, new Properties, null))
           val rows: Array[InternalRow] = child.doExecute().toArray
           val beforeBuild = System.nanoTime()
           longMetric("collectTime", DirectSQLMetrics.createMetric()) += NANOSECONDS.toMillis(
@@ -195,7 +205,6 @@ case class SubqueryDirectExec(name: String, child: DirectPlan)
 
   override def prepare(): Unit = {
     relationFuture
-    Thread.sleep(1L)
   }
 
   override def doExecute(): Iterator[InternalRow] = {
