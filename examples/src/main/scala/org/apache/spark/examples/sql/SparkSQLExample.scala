@@ -55,11 +55,11 @@ object SparkSQLExample {
     // For implicit conversions like converting RDDs to DataFrames
     // $example off:init_session$
 
-    //runBasicDataFrameExample(spark)
+    runBasicDataFrameExample(spark)
     //    runDatasetCreationExample(spark)
     //    runInferSchemaExample(spark)
     //    runProgrammaticSchemaExample(spark)
-    runSubqueryExample(spark)
+//    runSubqueryExample(spark)
 
     spark.stop()
   }
@@ -67,8 +67,9 @@ object SparkSQLExample {
   private def runBasicDataFrameExample(spark: SparkSession): Unit = {
     // $example on:create_df$
     val df = spark
-      .createDataFrame(List(("a", 2, 0), ("bbb", 2, 1), ("c", 3, 0), ("ddd", 4, 1), ("e", 5, 1)))
-      .toDF("name", "age", "genda")
+    .createDataFrame(
+      List(("alic", 2, 0), ("bob", 6, 1), ("cat", 3, 0), ("dg", 4, 1), ("elice", 5, 1)))
+    .toDF("name", "age", "genda")
     val df2 = spark
       .createDataFrame(List(("a", 1, 0), ("b", 2, 1), ("c", 3, 0)))
       .toDF("name", "age", "genda")
@@ -139,9 +140,11 @@ object SparkSQLExample {
 
 //    val sqlDF = spark.sql("SELECT substring(name,0,1) as c1 ,age as c2 FROM people where age>1")
 //    val sqlDF = spark.sql("SELECT substring(t1.name,0,1) as c1 ,substring(t2.name,0,2) as c2 FROM people t1,people2 t2 where t1.name=t2.name and t2.age>0")
+val sqlDF = spark.sql("SELECT name,ROW_NUMBER() OVER (PARTITION BY genda ORDER BY name) as row FROM people")
 
-    val sqlDF = spark.sql("SELECT genda,max(age),count(*) FROM people group by genda")
+//    val sqlDF = spark.sql("SELECT genda,max(age),count(*) FROM people group by genda")
 
+//    val sqlDF = spark.sql("select name,age from people order by age")
     //    val rt = sqlDF.collect()
     val s1 = StopWatch.createStarted()
     val rt = sqlDF.collectDirectly()

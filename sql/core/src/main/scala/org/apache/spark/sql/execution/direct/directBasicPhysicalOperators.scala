@@ -61,6 +61,13 @@ case class ProjectDirectExec(projectList: Seq[NamedExpression], child: DirectPla
 
 }
 
+case class LimitDirectExec(limit: Int, child: DirectPlan) extends UnaryDirectExecNode {
+    override def doExecute(): Iterator[InternalRow] = {
+      child.execute().take(limit)
+    }
+    override def output: Seq[Attribute] = child.output
+  }
+
 case class FilterDirectExec(condition: Expression, child: DirectPlan)
     extends UnaryDirectExecNode
     with PredicateHelper {

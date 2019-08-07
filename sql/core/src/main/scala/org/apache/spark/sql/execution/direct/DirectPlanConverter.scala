@@ -18,18 +18,14 @@
 package org.apache.spark.sql.execution.direct
 
 import org.apache.spark.sql.catalyst.expressions
+import org.apache.spark.sql.catalyst.expressions.SortOrder
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.aggregate.{
-  HashAggregateExec,
-  ObjectHashAggregateExec,
-  SortAggregateExec
-}
-import org.apache.spark.sql.execution.joins.{
-  BroadcastNestedLoopJoinExec,
-  CartesianProductExec,
-  HashJoin,
-  SortMergeJoinExec
-}
+import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
+import org.apache.spark.sql.execution.direct.window.WindowDirectExec
+import org.apache.spark.sql.execution.joins.{BroadcastNestedLoopJoinExec, CartesianProductExec, HashJoin, SortMergeJoinExec}
+import org.apache.spark.sql.execution.window.WindowExec
+
+
 object DirectPlanConverter {
 
   def convert(plan: SparkPlan): DirectPlan = {
@@ -45,7 +41,23 @@ object DirectPlanConverter {
           subquery.exprId)
     }
 
-    plan0 match {
+    val plan1 = plan0.transformUp {
+    case operator: SparkPlan =>
+      var children: Seq[SparkPlan] = operator.children
+      val requiredChildOrderings: Seq[Seq[SortOrder]] = operator.requiredChildOrdering
+      children = children.zip(requiredChildOrderings).map {
+        case (child, requiredOrdering) =>
+          // If child.outputOrdering already satisfies the requiredOrdering, we do not need to sort.
+          if (SortOrder.orderingSatisfies(child.outputOrdering, requiredOrdering)) {
+            child
+          } else {
+            SortExec(requiredOrdering, global = false, child = child)
+          }
+      }
+      operator.withNewChildren(children)
+    }
+
+    plan1 match {
       // basic
       case ProjectExec(projectList, child) =>
         ProjectDirectExec(projectList, convert(child))
@@ -53,6 +65,8 @@ object DirectPlanConverter {
         FilterDirectExec(condition, convert(child))
       case DynamicLocalTableScanExec(output, name) =>
         LocalTableScanDirectExec(output, name)
+      case CollectLimitExec(limit, child) =>
+        LimitDirectExec(limit, convert(child))
 
       // join
       case hashJoin: HashJoin =>
@@ -97,6 +111,13 @@ object DirectPlanConverter {
           hashAggregateExec.resultExpressions,
           convert(hashAggregateExec.child))
 
+      case windowExec: WindowExec =>
+        WindowDirectExec(
+          windowExec.windowExpression,
+          windowExec.partitionSpec,
+          windowExec.orderSpec,
+          convert(windowExec.child))
+
       case sortAggregateExec: SortAggregateExec =>
         SortAggregateDirectExec(
           sortAggregateExec.groupingExpressions,
@@ -105,6 +126,11 @@ object DirectPlanConverter {
           sortAggregateExec.initialInputBufferOffset,
           sortAggregateExec.resultExpressions,
           convert(sortAggregateExec.child))
+      case sortExec: SortExec =>
+        SortDirectExec(sortExec.sortOrder,
+          sortExec.global,
+          convert(sortExec.child),
+          sortExec.testSpillFrequency)
 
       // TODO other
       case other =>
