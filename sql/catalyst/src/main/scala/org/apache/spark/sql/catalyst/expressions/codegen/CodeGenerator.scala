@@ -1261,7 +1261,7 @@ object CodeGenerator extends Logging {
     val parentClassLoader = new ParentClassLoader(Utils.getContextOrSparkClassLoader)
     evaluator.setParentClassLoader(parentClassLoader)
     // Cannot be under package codegen, or fail with java.lang.InstantiationException
-    evaluator.setClassName("org.apache.spark.sql.catalyst.expressions.GeneratedClass")
+//    evaluator.setClassName("org.apache.spark.sql.catalyst.expressions.GeneratedClass")
     evaluator.setDefaultImports(
       classOf[Platform].getName,
       classOf[InternalRow].getName,
@@ -1282,12 +1282,14 @@ object CodeGenerator extends Logging {
 
     logDebug({
       // Only add extra debugging info to byte code when we are going to print the source code.
-      evaluator.setDebuggingInformation(true, true, false)
+//      evaluator.setDebuggingInformation(true, true, false)
+      evaluator.setDebuggingInformation(true, true, true)
       s"\n${CodeFormatter.format(code)}"
     })
 
     val maxCodeSize = try {
-      evaluator.cook("generated.java", code.body)
+//      evaluator.cook("generated.java", code.body)
+      evaluator.cook(code.body)
       updateAndGetCompilationStats(evaluator)
     } catch {
       case e: InternalCompilerException =>

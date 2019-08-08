@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.util.StringUtils.PlanStringConcat
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.adaptive.InsertAdaptiveSparkPlan
+import org.apache.spark.sql.execution.direct.{DirectPlan, DirectPlanConverter}
 import org.apache.spark.sql.execution.exchange.{EnsureRequirements, ReuseExchange}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.Utils
@@ -92,6 +93,10 @@ class QueryExecution(
     // clone the plan to avoid sharing the plan instance between different stages like analyzing,
     // optimizing and planning.
     prepareForExecution(sparkPlan.clone())
+  }
+
+  lazy val directExecutedPlan: DirectPlan = tracker.measurePhase(QueryPlanningTracker.PLANNING) {
+    DirectPlanConverter.convert(sparkPlan)
   }
 
   /**

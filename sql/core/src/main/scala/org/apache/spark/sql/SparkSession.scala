@@ -653,6 +653,10 @@ class SparkSession private(
     Dataset.ofRows(self, plan, tracker)
   }
 
+  def directSql(sqlText: String): Array[Row] = {
+    sql(sqlText).collectDirectly()
+  }
+
   /**
    * Returns a [[DataFrameReader]] that can be used to read non-streaming data in as a
    * `DataFrame`.
@@ -1072,10 +1076,14 @@ object SparkSession extends Logging {
   private val HIVE_SESSION_STATE_BUILDER_CLASS_NAME =
     "org.apache.spark.sql.hive.HiveSessionStateBuilder"
 
+  private val DIRECT_SESSION_STATE_BUILDER_CLASS_NAME =
+    "org.apache.spark.sql.execution.direct.DirectSessionStateBuilder"
+
   private def sessionStateClassName(conf: SparkConf): String = {
     conf.get(CATALOG_IMPLEMENTATION) match {
       case "hive" => HIVE_SESSION_STATE_BUILDER_CLASS_NAME
       case "in-memory" => classOf[SessionStateBuilder].getCanonicalName
+      case "direct" => DIRECT_SESSION_STATE_BUILDER_CLASS_NAME
     }
   }
 

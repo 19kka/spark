@@ -38,7 +38,7 @@ object StaticSQLConf {
   val CATALOG_IMPLEMENTATION = buildStaticConf("spark.sql.catalogImplementation")
     .internal()
     .stringConf
-    .checkValues(Set("hive", "in-memory"))
+    .checkValues(Set("hive", "in-memory", "direct"))
     .createWithDefault("in-memory")
 
   val GLOBAL_TEMP_DATABASE = buildStaticConf("spark.sql.globalTempDatabase")

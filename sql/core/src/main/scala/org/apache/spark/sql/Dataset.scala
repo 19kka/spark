@@ -18,6 +18,7 @@
 package org.apache.spark.sql
 
 import java.io.{ByteArrayOutputStream, CharArrayWriter, DataOutputStream}
+import java.util.Properties
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
@@ -26,13 +27,15 @@ import scala.util.control.NonFatal
 
 import org.apache.commons.lang3.StringUtils
 
-import org.apache.spark.TaskContext
+import org.apache.spark.{SparkConf, TaskContext, TaskContextImpl}
 import org.apache.spark.annotation.{DeveloperApi, Evolving, Experimental, Stable, Unstable}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.api.java.function._
 import org.apache.spark.api.python.{PythonRDD, SerDeUtil}
 import org.apache.spark.api.r.RRDD
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.internal.config.MEMORY_OFFHEAP_ENABLED
+import org.apache.spark.memory.{TaskMemoryManager, UnifiedMemoryManager}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.QueryPlanningTracker
 import org.apache.spark.sql.catalyst.analysis._
@@ -51,6 +54,7 @@ import org.apache.spark.sql.execution.arrow.{ArrowBatchStreamWriter, ArrowConver
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Relation, FileTable}
+import org.apache.spark.sql.execution.direct.DirectExecutionContext
 import org.apache.spark.sql.execution.python.EvaluatePython
 import org.apache.spark.sql.execution.stat.StatFunctions
 import org.apache.spark.sql.internal.SQLConf
@@ -2796,6 +2800,32 @@ class Dataset[T] private[sql](
    * @since 1.6.0
    */
   def collect(): Array[T] = withAction("collect", queryExecution)(collectFromPlan)
+
+  def collectDirectly(): Array[T] = {
+    try {
+      val enc = resolvedEnc.copy()
+      // hold current active SparkSession
+      DirectExecutionContext.get()
+      val directExecutedPlan = queryExecution.directExecutedPlan
+      val taskMemoryManager = new TaskMemoryManager(
+        new UnifiedMemoryManager(
+          new SparkConf().set(MEMORY_OFFHEAP_ENABLED.key, "false"),
+          Long.MaxValue,
+          Long.MaxValue / 2,
+          1),
+        0)
+      // prepare a TaskContext for execution
+      TaskContext.setTaskContext(new TaskContextImpl(0, 0, 0, 0, 0,
+        taskMemoryManager, new Properties, null))
+      val iter = directExecutedPlan.execute()
+      val data = iter.map(enc.fromRow).toArray
+      data
+    } finally {
+      DirectExecutionContext.get().markCompleted()
+      TaskContext.unset()
+      DirectExecutionContext.unset()
+    }
+  }
 
   /**
    * Returns a Java list that contains all rows in this Dataset.
