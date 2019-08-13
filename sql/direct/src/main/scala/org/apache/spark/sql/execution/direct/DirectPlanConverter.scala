@@ -151,6 +151,10 @@ object DirectPlanConverter {
           generateExec.outer,
           generateExec.generatorOutput,
           convertToDirectPlan(generateExec.child))
+      case expandExec: ExpandExec =>
+        ExpandDirectExec(expandExec.projections,
+          expandExec.output,
+          convertToDirectPlan(expandExec.child))
 
       // TODO other
       case other =>
